@@ -6,8 +6,7 @@
 
 ### **Bước 1: Mở trang thời khóa biểu**
 ```
-Truy cập vào trang web có thời khóa biểu HTML table
-(VD: Portal sinh viên, hệ thống quản lý học tập)
+Truy cập vào trang web có thời khóa biểu VMU
 ```
 
 ### **Bước 2: Mở Developer Tools**
@@ -23,7 +22,7 @@ Click vào tab "Console" trong Developer Tools
 
 ### **Bước 4: Paste và chạy code**
 ```javascript
-// Copy toàn bộ code từ file schedule-generator.js
+// Copy toàn bộ code từ file generator.js
 // Paste vào Console và nhấn Enter
 ```
 
