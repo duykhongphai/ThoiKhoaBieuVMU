@@ -24,54 +24,95 @@
         const subjects = [];
         const rows = document.querySelectorAll('table tbody tr');
         
-        rows.forEach(row => {
+        let i = 0;
+        while (i < rows.length) {
+            const row = rows[i];
             const cells = row.querySelectorAll('td');
-            if (cells.length < 6) return;
             
-            const codeElement = cells[1]?.querySelector('span');
-            const nameElement = cells[2]?.querySelector('a');
-            const creditElement = cells[3]?.querySelector('span');
-            const timeElement = cells[4];
-            const teacherElement = cells[5]?.querySelector('span');
+            // Kiểm tra xem có phải row chính (có đủ thông tin môn học) không
+            if (cells.length >= 6) {
+                const codeElement = cells[1]?.querySelector('span');
+                const nameElement = cells[2]?.querySelector('a');
+                const creditElement = cells[3]?.querySelector('span');
+                const teacherElement = cells[5]?.querySelector('span');
+                
+                // Nếu có thông tin môn học đầy đủ
+                if (nameElement) {
+                    const code = codeElement?.textContent?.trim() || '';
+                    const name = nameElement.textContent.trim().replace(/\s*\([^)]*\)\s*$/, '');
+                    const credits = parseInt(creditElement?.textContent?.trim()) || 0;
+                    const teacher = teacherElement?.textContent?.trim() || '';
+                    
+                    // Parse thời gian từ row hiện tại
+                    const timeElement = cells[4];
+                    const schedule1 = parseTimeInfo(timeElement);
+                    
+                    if (schedule1.day > 0) {
+                        subjects.push({
+                            code,
+                            name,
+                            credits,
+                            day: schedule1.day,
+                            periods: schedule1.periods,
+                            room: schedule1.room,
+                            teacher
+                        });
+                    }
+                    
+                    // Kiểm tra row tiếp theo có phải là lịch thứ 2 của cùng môn không
+                    const nextRow = rows[i + 1];
+                    if (nextRow) {
+                        const nextCells = nextRow.querySelectorAll('td');
+                        
+                        // Nếu row tiếp theo chỉ có 1 cell (là cell thời gian do rowspan)
+                        if (nextCells.length === 1) {
+                            const schedule2 = parseTimeInfo(nextCells[0]);
+                            
+                            if (schedule2.day > 0) {
+                                subjects.push({
+                                    code,
+                                    name,
+                                    credits,
+                                    day: schedule2.day,
+                                    periods: schedule2.periods,
+                                    room: schedule2.room,
+                                    teacher
+                                });
+                            }
+                            
+                            i++; // Skip row tiếp theo vì đã xử lý
+                        }
+                    }
+                }
+            }
             
-            if (!nameElement || !timeElement) return;
-            
-            const code = codeElement?.textContent?.trim() || '';
-            const name = nameElement.textContent.trim();
-            const credits = parseInt(creditElement?.textContent?.trim()) || 0;
-            const teacher = teacherElement?.textContent?.trim() || '';
-
-            const timeText = timeElement.textContent;
-            let day = 0, periods = [], room = '';
-    
-            const dayMatch = timeText.match(/Thứ\s*(\d+)/);
-            if (dayMatch) {
-                day = parseInt(dayMatch[1]);
-            }
-            const periodMatch = timeText.match(/Tiết\s*([\d,\s]+)/);
-            if (periodMatch) {
-                periods = periodMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => p);
-            }
-            const roomMatch = timeText.match(/Phòng\s*([^\n\r]*)/);
-            if (roomMatch) {
-                room = roomMatch[1].trim();
-            }
-            
-            if (name && day > 0 && day <= 7) { // Chỉ lấy Thứ 2-7
-                subjects.push({
-                    code,
-                    name: name.replace(/\s*\([^)]*\)\s*$/, ''), // Loại bỏ (N01), (N02), etc.
-                    credits,
-                    day,
-                    periods,
-                    room,
-                    teacher
-                });
-            }
-        });
+            i++;
+        }
         
-        console.log('📚 Đã parse được', subjects.length, 'môn học:', subjects);
+        console.log('📚 Đã parse được', subjects.length, 'lịch học từ', new Set(subjects.map(s => s.code)).size, 'môn:', subjects);
         return subjects;
+    }
+    
+    function parseTimeInfo(timeElement) {
+        const timeText = timeElement.textContent;
+        let day = 0, periods = [], room = '';
+        
+        const dayMatch = timeText.match(/Thứ\s*(\d+)/);
+        if (dayMatch) {
+            day = parseInt(dayMatch[1]);
+        }
+        
+        const periodMatch = timeText.match(/Tiết\s*([\d,\s]+)/);
+        if (periodMatch) {
+            periods = periodMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => p);
+        }
+        
+        const roomMatch = timeText.match(/Phòng\s*([^\n\r]*)/);
+        if (roomMatch) {
+            room = roomMatch[1].trim();
+        }
+        
+        return { day, periods, room };
     }
     
     function createScheduleHTML(subjects) {
@@ -85,6 +126,13 @@
             '#FECA57', '#FF9FF3', '#54A0FF', '#5F27CD',
             '#00D2D3', '#FF9F43', '#10AC84', '#EE5A24'
         ];
+        
+        // Tạo map để gán màu cho mỗi môn (theo code)
+        const uniqueCodes = [...new Set(subjects.map(s => s.code))];
+        const colorMap = {};
+        uniqueCodes.forEach((code, index) => {
+            colorMap[code] = colors[index % colors.length];
+        });
         
         let scheduleHTML = `
         <div id="scheduleImageContainer" style="
@@ -170,8 +218,7 @@
                 const subject = subjects.find(s => s.day === day && s.periods.includes(period));
                 
                 if (subject) {
-                    const colorIndex = subjects.findIndex(s => s.code === subject.code) % colors.length;
-                    const color = colors[colorIndex];
+                    const color = colorMap[subject.code];
                     
                     scheduleHTML += `
                             <td style="
@@ -275,7 +322,7 @@
                 return;
             }
             
-            console.log('📊 Tìm thấy', subjects.length, 'môn học');
+            console.log('📊 Tìm thấy', subjects.length, 'lịch học');
             
             await downloadScheduleImage(subjects);
             
@@ -296,5 +343,7 @@ console.log(`
 4. Paste toàn bộ đoạn code này vào và nhấn Enter
 5. Chờ một chút, ảnh sẽ được tải xuống tự động!
 
-📝 Lưu ý: Code sẽ tự động parse dữ liệu từ table HTML trên trang
+📝 Lưu ý: 
+- Code hỗ trợ môn học có 2 buổi/tuần (rowspan)
+- Cùng một môn sẽ có cùng màu trên các ngày khác nhau
 `);
